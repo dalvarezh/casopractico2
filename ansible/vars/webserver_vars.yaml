@@ -1,0 +1,10 @@
+NONROOT_USER: dalvarezh
+WORKING_DIR: /home/{{NONROOT_USER}}/webserver
+WEBSERVER_USERNAME : dalvarezh
+WEBSERVER_PASSWORD : dalvarezh
+WEBSERVER_PATH: /usr/local/apache2
+WEBSERVER_KEY: webserver
+REGISTRY_USERNAME: registrydalvarezh
+REGISTRY_PASSWORD: plHDEigqVmTsXw7HzlizkAHBNruy4Fmqv4tXXP5zpt+ACRD0pVsR
+REGISTRY_NAME: registrydalvarezh.azurecr.io
+IMAGE_TAG: casopractico2

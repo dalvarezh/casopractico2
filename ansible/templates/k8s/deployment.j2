@@ -1,0 +1,51 @@
+# Deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: "{{NAMESPACE}}"
+  name: "{{IMAGE_NAME}}"
+  labels:
+    app: "{{LABEL}}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{LABEL}}"
+  template:
+    metadata:
+      labels:
+        app: "{{LABEL}}"
+    spec:
+      containers:
+      - name: "{{IMAGE_NAME}}"
+        image: "{{IMAGE}}"
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+          requests:
+            memory: "500Mi"
+            cpu: "500m"
+        ports:
+{% for item in kube_services %}
+        - name: "{{item.name}}"
+          containerPort: {{item.container_port}}
+          protocol: "{{item.protocol}}"
+{% endfor %}
+        volumeMounts:
+{% for item in kube_persistent_volumes %}
+        - name: "{{item.name}}"
+          mountPath: "{{item.mount_path}}"
+{% endfor %}
+        env:
+{% for item in kube_environment_variables %}
+        - name: "{{item.name}}"
+          value: "{{item.value}}"
+{% endfor %}
+      volumes:
+{% for item in kube_persistent_volumes %}
+      - name: "{{item.name}}"
+        persistentVolumeClaim:
+          claimName: "{{item.name}}"
+{% endfor %}

@@ -1,0 +1,20 @@
+# Services, not allowed node port
+{% for item in kube_services %}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: "{{NAMESPACE}}"
+  name: "{{item.name}}"
+  labels:
+    app: "{{LABEL}}"
+spec:
+  selector:
+    app: "{{LABEL}}"
+  ports:
+    - name: "{{item.name}}"
+      port: {{item.port}}
+      targetPort: "{{item.name}}"
+      protocol: "{{item.protocol}}"
+  type: "{{item.type}}"
+{% endfor %}

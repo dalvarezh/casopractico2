@@ -1,0 +1,153 @@
+---
+- name: Webserver playbook
+  hosts: 20.68.239.146
+  remote_user: dalvarezh
+  vars_files:
+    - vars/webserver_vars.yaml
+  tasks:
+    - name: Install dependencies
+      block:
+      - name: Update package
+        yum:
+          name: '*'
+          state: latest
+      - name: Installing podman
+        yum:
+          name: podman
+          state: present
+      - name: Installing skopeo
+        yum:
+          name: skopeo
+          state: present
+      - name: Installing httpd-tools
+        yum:
+          name: httpd-tools
+          state: present
+      - name: Installing openssl
+        yum:
+          name: openssl
+          state: present
+      - name: Make sure we can use htpasswd module
+        pip: 
+          name: passlib 
+      become: true
+    - name:  Create required folders and files
+      block:
+        - name: Create dir for workspace
+          file:
+            path: '{{WORKING_DIR}}'
+            state: directory
+            owner: '{{NONROOT_USER}}'
+            group: '{{NONROOT_USER}}'
+            mode: 0755
+        - name: Copy index.html
+          copy: 
+            src: index.html
+            dest: '{{WORKING_DIR}}'
+        - name: Copy httpd.conf
+          template:
+            src: webserver/httpd.conf.j2
+            dest: '{{WORKING_DIR}}/httpd.conf'
+        - name: Copy htaccess
+          template:
+            src: webserver/.htaccess.j2
+            dest: '{{WORKING_DIR}}/.htaccess'
+        - name: Copy Containerfile
+          template:
+            src: webserver/Containerfile.j2
+            dest: '{{WORKING_DIR}}/Containerfile'
+    - name: Configure credentials for authentication
+      block:
+        - name: Create credentials with htpasswd
+          community.general.htpasswd: # htpasswd -cBb .creds <USERNAME> <PASSWORD>
+            path: '{{WORKING_DIR}}/.creds'
+            name: '{{WEBSERVER_USERNAME}}'
+            password: '{{WEBSERVER_PASSWORD}}'
+            crypt_scheme: md5_crypt
+            mode: 0755
+    - name:  Configure openssl crt
+      block:
+        - name: Create private key for crt
+          community.crypto.openssl_privatekey: # openssl genrsa -out <KEY_NAME>.key 2048
+            path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.key'
+            size: 2048
+        - name: Create sign request for crt
+          community.crypto.openssl_csr: # openssl req -key <KEY_NAME>.key -new -out <CSR_NAME>.csr -subj "/C=ES/ST=Madrid/L=Madrid/O=UNIR/OU=DevOps/CN=vm1"
+            path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.csr'
+            privatekey_path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.key'
+            country_name: SP
+            state_or_province_name : Madrid
+            locality_name : Madrid
+            organization_name : UNIR
+            organizational_unit_name : DevOps
+            common_name: vm1
+        - name: Create crt using key and request
+          community.crypto.x509_certificate: # openssl x509 -signkey <KEY_NAME>.key -in <CSR_NAME>.csr -req -days 365 -out <CERT_NAME>.crt
+            path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.crt'
+            privatekey_path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.key'
+            csr_path: '{{WORKING_DIR}}/{{WEBSERVER_KEY}}.csr'
+            provider: selfsigned
+            selfsigned_not_after: +365d
+    - name:  Create and push webserver image to registry
+      block:
+        - name: Build the webserver image
+          containers.podman.podman_image: # sudo podman build -t webserver .
+            name: webserver
+            path: '{{WORKING_DIR}}'
+        - name: Tag the webserver image
+          containers.podman.podman_tag: # sudo podman tag localhost/webserver:latest <REGISTRY_URL>/<REPOSITORY>:TAG
+            image: localhost/webserver:latest
+            target_names:
+              - '{{REGISTRY_NAME}}/webserver:{{IMAGE_TAG}}'
+        - name: Login into the Azure registry
+          containers.podman.podman_login: #sudo podman login -u <USERNAME> -p <PASSWORD>
+            username: '{{REGISTRY_USERNAME}}'
+            password: '{{REGISTRY_PASSWORD}}'
+            registry: '{{REGISTRY_NAME}}'
+        - name: Push the webserver image to the acr
+          containers.podman.podman_image: # sudo podman push <REGISTRY_URL>/<REPOSITORY>:TAG
+            name: '{{REGISTRY_NAME}}/webserver:{{IMAGE_TAG}}'
+            push: yes
+            push_args:
+              dest: '{{REGISTRY_NAME}}'
+      become: true
+    - name:  Run and configure the container image
+      block: 
+        - name: Create the container as a service
+          containers.podman.podman_container: # sudo podman create --name web -p 8080:443 localhost/webserver
+            name: webserver
+            image: '{{REGISTRY_NAME}}/webserver:{{IMAGE_TAG}}'
+            state: created
+            ports:
+                - "8080:443"
+            generate_systemd: # sudo podman generate systemd --new --files --name web2
+              path: /etc/systemd/system/ # sudo cp -Z container-web2.service /etc/systemd/system/
+        - name: Restart service and start webserver service
+          ansible.builtin.systemd: # sudo systemctl daemon-reload && sudo systemctl enable container-web2.service --now
+            name: container-webserver
+            state: started
+            enabled: true
+            daemon_reload: true
+      become: true
+    - name:  Create and push jenkins image to registry
+      block:
+        - name: Pull gitea image
+          containers.podman.podman_image:
+            name: docker.io/gitea/gitea
+            tag: 1.18
+        - name: Tag the gitea image
+          containers.podman.podman_tag:
+            image: docker.io/gitea/gitea:1.18
+            target_names:
+              - '{{REGISTRY_NAME}}/gitea:{{IMAGE_TAG}}'
+        - name: Login into the Azure registry
+          containers.podman.podman_login:
+            username: '{{REGISTRY_USERNAME}}'
+            password: '{{REGISTRY_PASSWORD}}'
+            registry: '{{REGISTRY_NAME}}'
+        - name: Push the gitea image to the acr
+          containers.podman.podman_image:
+            name: '{{REGISTRY_NAME}}/gitea:{{IMAGE_TAG}}'
+            push: yes
+            push_args:
+              dest: '{{REGISTRY_NAME}}'

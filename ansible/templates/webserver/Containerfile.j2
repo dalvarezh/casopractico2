@@ -1,0 +1,7 @@
+FROM docker.io/httpd:latest
+COPY index.html {{WEBSERVER_PATH}}/htdocs/
+COPY .htaccess {{WEBSERVER_PATH}}/htdocs/
+COPY httpd.conf {{WEBSERVER_PATH}}/conf/
+COPY .creds {{WEBSERVER_PATH}}/
+COPY {{WEBSERVER_KEY}}.key {{WEBSERVER_PATH}}/
+COPY {{WEBSERVER_KEY}}.crt {{WEBSERVER_PATH}}/

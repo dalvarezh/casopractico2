@@ -1,0 +1,37 @@
+---
+- name: K8s playbook
+  hosts: localhost
+  connection: local
+  remote_user: dalvarezh
+  vars_files:
+    - vars/k8s_vars.yaml
+  tasks:
+    - name: Make sure k8s playbook works
+      pip:
+        name:
+          - openshift
+          - pyyaml
+          - kubernetes 
+    - name: Configure k8s cluster
+      block:
+      - name: Create a k8s namespace
+        kubernetes.core.k8s:
+          name: '{{NAMESPACE}}'
+          kind: Namespace
+          state: present
+      - name: Deploy persistent volume from template
+        kubernetes.core.k8s:
+          state: present
+          template: 'k8s/persistent-volumes.j2'
+      - name: Deploy persistent volume claim from template
+        kubernetes.core.k8s:
+          state: present
+          template: 'k8s/persistent-volumes-claim.j2'
+      - name: Deploy services from template
+        kubernetes.core.k8s:
+          state: present
+          template: 'k8s/services.j2'
+      - name: Deploy pod from template
+        kubernetes.core.k8s:
+          state: present
+          template: 'k8s/deployment.j2'

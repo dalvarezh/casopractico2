@@ -1,0 +1,19 @@
+# Persistent Volumes
+{% for item in kube_persistent_volumes %}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  namespace: "{{NAMESPACE}}"
+  name: "{{item.name}}"
+  labels:
+    app: "{{LABEL}}"
+spec:
+  storageClassName: "{{item.storage_name}}"
+  capacity:
+    storage: "{{item.capacity_storage}}"
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "{{item.host_path}}"
+{% endfor %}

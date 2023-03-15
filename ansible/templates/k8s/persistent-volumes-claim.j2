@@ -1,0 +1,18 @@
+# Persistent Volumes Claims
+{% for item in kube_persistent_volumes %}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: "{{NAMESPACE}}"
+  name: "{{item.name}}"
+  labels:
+    app: "{{LABEL}}"
+spec:
+  storageClassName: "{{item.storage_name}}"
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "{{item.capacity_storage}}"
+{% endfor %}

@@ -1,0 +1,10 @@
+NAMESPACE: casopractico2
+LABEL: casopractico2
+REGISTRY_NAME: registrydalvarezh.azurecr.io
+IMAGE_TAG: casopractico2
+IMAGE_NAME: gitea
+IMAGE: '{{REGISTRY_NAME}}/{{IMAGE_NAME}}:{{IMAGE_TAG}}'
+
+kube_persistent_volumes: [ { name: "gitea", storage_name: "data", capacity_storage: "5Gi", host_path: "/data/gitea", mount_path: "/data" } ]
+kube_environment_variables: [ { name: "USER_UID", value: "1000"}, { name: "USER_GID", value: "1000"} ]
+kube_services: [ { name: "gitea-http", port: 3000, protocol: "TCP", target_port: 3000, container_port: 3000, type: "LoadBalancer"} ]
